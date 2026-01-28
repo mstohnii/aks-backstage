@@ -19,3 +19,4 @@ See [QUICK_START.md](QUICK_START.md) for Helm deployment instructions.
 - `packages/backend` - Backend Node.js server
 - `helm/backstage` - Kubernetes Helm charts
 - `scripts` - Deployment scripts for AKS
+- `BACKSTAGE_LAB/` - [Backstage lab templates and configurations](./BACKSTAGE_LAB/README.md)

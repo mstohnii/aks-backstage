@@ -1,0 +1,41 @@
+trigger:
+- main
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+- task: TerraformTaskV4@4
+  displayName: Terraform Init
+  inputs:
+    provider: 'azurerm'
+    command: 'init'
+    backendServiceArm: '<YOUR_AZURE_SERVICE_CONNECTION_TO_RESOURCE_MANAGER>'
+    backendAzureRmResourceGroupName: '<RESOURCE_GROUP_NAME>'
+    backendAzureRmStorageAccountName: '<STORAGE_ACCOUNT_NAME>'
+    backendAzureRmContainerName: '<CONTAINER_NAME>'
+   #backendAzureRmKey: '<AZ_KEY_NAME>'
+    workingDirectory: $(System.DefaultWorkingDirectory)/terraform/changed
+
+- task: TerraformTaskV4@4
+  displayName: Terraform Validate
+  inputs:
+    provider: 'azurerm'
+    command: 'validate'
+    workingDirectory: $(System.DefaultWorkingDirectory)/terraform/changed
+
+- task: TerraformTaskV4@4
+  displayName: Terraform Plan
+  inputs:
+    provider: 'azurerm'
+    command: 'plan'
+    environmentServiceNameAzureRM: '<YOUR_AZURE_SERVICE_CONNECTION_TO_RESOURCE_MANAGER>'
+    workingDirectory: $(System.DefaultWorkingDirectory)/terraform/changed
+
+- task: TerraformTaskV4@4
+  displayName: Terraform Apply
+  inputs:
+    provider: 'azurerm'
+    command: 'apply'
+    workingDirectory: '$(System.DefaultWorkingDirectory)/terraform/changed'
+    environmentServiceNameAzureRM: '<YOUR_AZURE_SERVICE_CONNECTION_TO_RESOURCE_MANAGER>'

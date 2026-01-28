@@ -1,0 +1,85 @@
+# Template for creating a new Azure DevOps repository and pushing a new Backstage component to it.
+
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: azure-repo-demo-2
+  title: BS magic 1
+  description: Clone and push to an Azure repository example.
+spec:
+  owner: stas
+  type: service
+
+  parameters:
+    - title: Fill in some steps
+      required:
+        - name
+        - targetBranch
+      properties:
+        name:
+          title: Resource group
+          type: string
+          description: Choose a unique resource-group name.
+          default: demo-group
+        targetBranch:
+          title: Target branch
+          type: string
+          description: Branch name to push changes to.
+          default: bsmagic
+
+  steps:
+    - id: cloneAzureRepo
+      name: Clone Azure Repo
+      action: azure:repo:clone
+      input:
+        remoteUrl: "https://<YOUR_AZURE_DEVOPS_SUBDOMAIN>@dev.azure.com/<YOUR_ORGANIZATION>/<YOUR_PROJECT>/_git/<YOUR_REPO_NAME>"
+        branch: "main"
+        targetPath: ./sub-directory
+
+    - id: fetch
+      name: Template Skeleton
+      action: fetch:template
+      input:
+        url: ./tf-templates
+        targetPath: ./sub-directory/terraform/changed
+        replace: true
+        values:
+          name: ${{ parameters.name }}
+
+    - id: fetchPipelines
+      name: Fetch Azure DevOps Pipelines
+      action: fetch:template
+      input:
+        url: ../pipelines
+        targetPath: ./sub-directory/pipelines
+        replace: true
+
+    - id: pushAzureRepo
+      name: Push to Remote Azure Repo
+      action: azure:repo:push
+      input:
+        remoteUrl: "https://<YOUR_AZURE_DEVOPS_SUBDOMAIN>@dev.azure.com/<YOUR_ORGANIZATION>/<YOUR_PROJECT>/_git/<YOUR_REPO_NAME>"
+        branch: ${{ parameters.targetBranch }}
+        sourcePath: ./sub-directory
+        gitCommitMessage: "Test project file"
+
+    - id: pullRequestAzureRepo
+      name: Create a Pull Request to Azure Repo
+      action: azure:repo:pr
+      input:
+        sourceBranch: ${{ parameters.targetBranch }}
+        targetBranch: main
+        repoId: <YOUR_REPO_NAME>
+        title: Backstage changes for ${{ parameters.name }}
+        project: <YOUR_PROJECT>
+        organization: <YOUR_ORGANIZATION>
+        description: "This is a pull request from Backstage"
+        supportsIterations: false
+
+  output:
+    links:
+      - title: Repository
+        url: "https://dev.azure.com/<YOUR_ORGANIZATION>/<YOUR_PROJECT>/_git/<YOUR_REPO_NAME>"
+      - title: Pull Request
+        url: "https://dev.azure.com/<YOUR_ORGANIZATION>/<YOUR_PROJECT>/_git/<YOUR_REPO_NAME>/pullrequest/${{ steps.pullRequestAzureRepo.output.pullRequestId }}"
+  
