@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backstage-examples
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app.kubernetes.io/name: backstage
+    app.kubernetes.io/instance: {{ .Release.Name }}
+data:
+  entities.yaml: |-
+{{ .Files.Get "files/examples/entities.yaml" | nindent 4 }}
+  template.yaml: |-
+{{ .Files.Get "files/examples/template/template.yaml" | nindent 4 }}

@@ -1,0 +1,93 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backstage-config
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app.kubernetes.io/name: backstage
+    app.kubernetes.io/instance: {{ .Release.Name }}
+data:
+  app-config.production.yaml: |
+    app:
+      title: {{ .Values.backstage.config.app.title }}
+      baseUrl: {{ .Values.backstage.config.app.baseUrl }}
+    
+    organization:
+      name: {{ .Values.backstage.config.organization.name }}
+    
+    backend:
+      baseUrl: {{ .Values.backstage.config.backend.baseUrl }}
+      listen: ':{{ .Values.backstage.backend.port }}'
+      logger:
+        level: info
+        meta:
+          env: prod
+        overrides:
+          - matchers:
+              service: rootHttpRouter
+              type: incomingRequest
+            level: warn
+      database:
+        client: pg
+        connection:
+          host: backstage-postgresql
+          port: 5432
+          user: backstage
+          password: ${POSTGRES_PASSWORD}
+    
+    auth:
+      environment: development
+      providers:
+        guest: {}
+        microsoft:
+          development:
+            clientId: ${AZURE_CLIENT_ID}
+            clientSecret: ${AZURE_CLIENT_SECRET}
+            tenantId: ${AZURE_TENANT_ID}
+            domainHint: ${AZURE_TENANT_ID}
+            signIn:
+              resolvers:
+                - resolver: userIdMatchingUserEntityAnnotation
+    
+    integrations:
+      azure:
+        - host: dev.azure.com
+          credentials:
+            - personalAccessToken: ${PERSONAL_ACCESS_TOKEN}
+    
+    catalog:
+      import:
+        entityFilename: catalog-info.yaml
+        pullRequestBranchName: backstage-integration
+      rules:
+        - allow: [Component, System, API, Resource, Location, Template]
+      providers:
+        microsoftGraphOrg:
+          default:
+            tenantId: ${AZURE_TENANT_ID}
+            clientId: ${AZURE_CLIENT_ID}
+            clientSecret: ${AZURE_CLIENT_SECRET}
+            user:
+              filter: accountEnabled eq true and userType eq 'member'
+            group:
+              filter: >
+                securityEnabled eq false
+                and mailEnabled eq true
+                and groupTypes/any(c:c+eq+'Unified')
+            schedule:
+              frequency: PT1H
+              timeout: PT50M
+      locations:
+        - type: file
+          target: /app/examples/entities.yaml
+        - type: file
+          target: /app/examples/template/template.yaml
+          rules:
+            - allow:
+                - Template
+        - type: file
+          target: /app/examples/org.yaml
+          rules:
+            - allow:
+                - User
+                - Group

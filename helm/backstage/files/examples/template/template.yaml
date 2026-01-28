@@ -1,0 +1,26 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: example-template
+  title: Example Template
+  description: Minimal placeholder template shipped with the Helm chart.
+spec:
+  owner: guests
+  type: service
+  parameters:
+    - title: Basic
+      required: [name]
+      properties:
+        name:
+          title: Name
+          type: string
+  steps:
+    - id: log
+      name: Log
+      action: debug:log
+      input:
+        message: "Template executed for ${{ parameters.name }}"
+  output:
+    text:
+      - title: Result
+        content: "Done"

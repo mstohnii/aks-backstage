@@ -1,0 +1,248 @@
+# Default values for Backstage Helm chart
+# This is a YAML-formatted file for Kubernetes value substitution
+
+# Global settings
+global:
+  namespace: backstage
+
+# Backstage Frontend and Backend Configuration
+backstage:
+  replicaCount: 2
+  
+  image:
+    repository: <YOUR-CR-NAME>.azurecr.io/backstage-app  # Replace with your ACR name
+    pullPolicy: Always
+    tag: "latest"  # Will be overridden during deployment
+  
+  imagePullSecrets: []
+  
+  nameOverride: ""
+  fullnameOverride: ""
+  
+  # Backstage configuration
+  config:
+    app:
+      title: "Backstage"
+      baseUrl: "http://localhost:7007"
+    
+    organization:
+      name: "using Values"
+    
+    backend:
+      baseUrl: "http://localhost:7007"
+      listen:
+        port: 7007
+      csp:
+        connect-src: ["'self'", "http:", "https:"]
+      cors:
+        origin: "http://localhost:7007"
+        credentials: true
+  
+  # Frontend service
+  frontend:
+    enabled: true
+    port: 3000
+    service:
+      type: ClusterIP
+      port: 80
+      targetPort: 3000
+    ingress:
+      enabled: true
+      className: "nginx"
+      annotations:
+        # Cloudflare Flexible SSL - no TLS termination at ingress
+        nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+        nginx.ingress.kubernetes.io/ssl-redirect: "false"
+
+      hosts:
+        - host: <YOUR-DOMAIN-HERE>
+          paths:
+            - path: /
+              pathType: Prefix
+      # No TLS - Cloudflare handles HTTPS
+      tls: []
+  
+  # Backend service
+  backend:
+    enabled: true
+    port: 7007
+    service:
+      type: ClusterIP
+      port: 80
+      targetPort: 7007
+    ingress:
+      enabled: true
+      className: "nginx"
+      annotations:
+        # Cloudflare Flexible SSL - no TLS termination at ingress
+        nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+        nginx.ingress.kubernetes.io/ssl-redirect: "false"
+      hosts:
+        - host: <YOUR-DOMAIN-HERE>
+          paths:
+            - path: /
+              pathType: Prefix
+      # No TLS - Cloudflare handles HTTPS
+      tls: []
+  
+  # Resource limits
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  
+  # Pod security context
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+  
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  
+  # Node affinity
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                    - backstage
+            topologyKey: kubernetes.io/hostname
+  
+  # Liveness and readiness probes
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 7007
+    initialDelaySeconds: 60
+    periodSeconds: 10
+  
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 7007
+    initialDelaySeconds: 30
+    periodSeconds: 10
+
+# PostgreSQL Configuration
+postgresql:
+  enabled: true
+  auth:
+    username: backstage
+    password: "changeme123!"  # IMPORTANT: Change this!
+    database: backstage
+    postgresPassword: "postgres123!"  # IMPORTANT: Change this!
+  
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClassName: "default"  # Update with your storage class
+    
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+  
+  service:
+    type: ClusterIP
+    port: 5432
+    internal:
+      enabled: true
+  
+  metrics:
+    enabled: false
+    serviceMonitor:
+      enabled: false
+
+# Secrets management
+secrets:
+  # GitHub integration token (optional)
+  github:
+    token: ""  # Set via environment variable or --set
+  
+  # Azure DevOps Personal Access Token (optional)
+  azure:
+    personalAccessToken: <ENTER-YOUR-PAT-KEY>  # Set via environment variable or --set
+  
+  # Backend secret for service-to-service auth
+  backendSecret: <YOUR-BACKEND-SECRET-HERE>  # IMPORTANT: Change this!
+
+# Additional environment variables
+env:
+  - name: LOG_LEVEL
+    value: "info"
+  - name: NODE_ENV
+    value: "production"
+  - name: POSTGRES_HOST
+    value: "backstage-postgresql"
+  - name: POSTGRES_PORT
+    value: "5432"
+  - name: POSTGRES_USER
+    value: "backstage"
+  - name: POSTGRES_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: backstage-secrets
+        key: postgres-password
+  - name: PERSONAL_ACCESS_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: backstage-secrets
+        key: <YOUR_AZURE_DEVOPS_PAT_KEY>
+  - name: AZURE_CLIENT_ID
+    valueFrom:
+      secretKeyRef:
+        name: backstage-secrets
+        key: azure-client-id
+  - name: AZURE_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: backstage-secrets
+        key: azure-client-secret
+  - name: AZURE_TENANT_ID
+    valueFrom:
+      secretKeyRef:
+        name: backstage-secrets
+        key: azure-tenant-id
+
+# ServiceAccount
+serviceAccount:
+  create: true
+  annotations: {}
+  name: "backstage"
+
+# AutoScaling
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+# Network Policy
+networkPolicy:
+  enabled: false
+  policyTypes:
+    - Ingress
+    - Egress
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

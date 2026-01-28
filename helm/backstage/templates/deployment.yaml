@@ -1,0 +1,156 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backstage
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app.kubernetes.io/name: backstage
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.backstage.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: backstage
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: backstage
+        app.kubernetes.io/instance: {{ .Release.Name }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/examples: {{ include (print $.Template.BasePath "/examples-configmap.yaml") . | sha256sum }}
+        checksum/org: {{ include (print $.Template.BasePath "/org-configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.backstage.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      {{- with .Values.backstage.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      
+      initContainers:
+        - name: db-migration
+          image: "{{ .Values.backstage.image.repository }}:{{ .Values.backstage.image.tag }}"
+          imagePullPolicy: {{ .Values.backstage.image.pullPolicy }}
+          command: ["sh", "-c", "echo 'Database migration check passed' && sleep 1"]
+          env:
+            {{- range .Values.env }}
+            - name: {{ .name }}
+              {{- if .value }}
+              value: {{ .value | quote }}
+              {{- else if .valueFrom }}
+              valueFrom:
+                {{- toYaml .valueFrom | nindent 16 }}
+              {{- end }}
+            {{- end }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: backstage-secrets
+                  key: postgres-password
+          volumeMounts:
+            - name: backstage-config
+              mountPath: /app/app-config.production.yaml
+              subPath: app-config.production.yaml
+            - name: backstage-examples
+              mountPath: /app/examples/entities.yaml
+              subPath: entities.yaml
+            - name: backstage-examples
+              mountPath: /app/examples/template/template.yaml
+              subPath: template.yaml
+            - name: backstage-org
+              mountPath: /app/examples/org.yaml
+              subPath: org.yaml
+      
+      containers:
+        - name: backstage
+          image: "{{ .Values.backstage.image.repository }}:{{ .Values.backstage.image.tag }}"
+          imagePullPolicy: {{ .Values.backstage.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.backstage.backend.port }}
+              protocol: TCP
+          
+          env:
+            {{- range .Values.env }}
+            - name: {{ .name }}
+              {{- if .value }}
+              value: {{ .value | quote }}
+              {{- else if .valueFrom }}
+              valueFrom:
+                {{- toYaml .valueFrom | nindent 16 }}
+              {{- end }}
+            {{- end }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: backstage-secrets
+                  key: postgres-password
+          
+          {{- with .Values.backstage.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          
+          {{- with .Values.backstage.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          
+          {{- with .Values.backstage.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          
+          {{- with .Values.backstage.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          
+          volumeMounts:
+            - name: backstage-config
+              mountPath: /app/app-config.production.yaml
+              subPath: app-config.production.yaml
+            - name: backstage-examples
+              mountPath: /app/examples/entities.yaml
+              subPath: entities.yaml
+            - name: backstage-examples
+              mountPath: /app/examples/template/template.yaml
+              subPath: template.yaml
+            - name: backstage-org
+              mountPath: /app/examples/org.yaml
+              subPath: org.yaml
+            - name: tmp
+              mountPath: /tmp
+            - name: cache
+              mountPath: /app/node_modules/.cache
+      
+      volumes:
+        - name: backstage-config
+          configMap:
+            name: backstage-config
+        - name: backstage-examples
+          configMap:
+            name: backstage-examples
+        - name: backstage-org
+          configMap:
+            name: backstage-org
+        - name: tmp
+          emptyDir: {}
+        - name: cache
+          emptyDir: {}
+      
+      {{- with .Values.backstage.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

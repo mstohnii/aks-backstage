@@ -1,0 +1,13 @@
+apiVersion: v2
+name: backstage
+description: A Helm chart for deploying Backstage with PostgreSQL to Kubernetes
+type: application
+version: 1.0.0
+appVersion: "1.47.0"
+keywords:
+  - backstage
+  - developer-portal
+  - kubernetes
+maintainers:
+  - name: DevOps Team
+    email: contact@njordops.net

@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backstage-org
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app.kubernetes.io/name: backstage
+    app.kubernetes.io/instance: {{ .Release.Name }}
+data:
+  org.yaml: |-
+{{ .Files.Get "files/examples/org.yaml" | nindent 4 }}

@@ -1,0 +1,37 @@
+{{- if .Values.backstage.frontend.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: backstage-frontend
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app.kubernetes.io/name: backstage-frontend
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  {{- with .Values.backstage.frontend.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.backstage.frontend.ingress.className }}
+  ingressClassName: {{ .Values.backstage.frontend.ingress.className }}
+  {{- end }}
+  {{- with .Values.backstage.frontend.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- range .Values.backstage.frontend.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: backstage
+                port:
+                  number: {{ $.Values.backstage.backend.service.port }}
+          {{- end }}
+    {{- end }}
+{{- end }}

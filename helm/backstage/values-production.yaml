@@ -1,0 +1,170 @@
+# Production Values for Backstage Helm Chart
+# Use with: helm install backstage ./helm/backstage -f values-production.yaml
+
+global:
+  namespace: backstage
+
+backstage:
+  replicaCount: 3
+  
+  image:
+    repository: <YOUR-CR-NAME>.azurecr.io/backstage-app  # Replace with your ACR
+    pullPolicy: IfNotPresent
+    tag: "latest"
+  
+  imagePullSecrets: []
+  
+  config:
+    app:
+      title: "Backstage Developer Portal"
+      baseUrl: "https://backstage.example.com"  # Replace with your domain
+    
+    organization:
+      name: "Your Company"
+    
+    backend:
+      baseUrl: "https://backstage.example.com"  # Replace with your domain
+      listen:
+        port: 7007
+      csp:
+        connect-src: ["'self'", "http:", "https:"]
+      cors:
+        origin: "https://backstage.example.com"  # Replace with your domain
+        credentials: true
+  
+  frontend:
+    enabled: true
+    port: 3000
+    service:
+      type: ClusterIP
+      port: 80
+      targetPort: 3000
+    ingress:
+      enabled: true
+      className: "nginx"
+      annotations:
+        cert-manager.io/cluster-issuer: "letsencrypt-prod"
+        nginx.ingress.kubernetes.io/ssl-redirect: "true"
+        nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      hosts:
+        - host: "backstage.example.com"
+          paths:
+            - path: /
+              pathType: Prefix
+      tls:
+        - secretName: backstage-tls
+          hosts:
+            - "backstage.example.com"
+  
+  backend:
+    enabled: true
+    port: 7007
+    service:
+      type: ClusterIP
+      port: 80
+      targetPort: 7007
+    ingress:
+      enabled: true
+      className: "nginx"
+      annotations:
+        cert-manager.io/cluster-issuer: "letsencrypt-prod"
+        nginx.ingress.kubernetes.io/ssl-redirect: "true"
+        nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      hosts:
+        - host: "backstage.example.com"
+          paths:
+            - path: /
+              pathType: Prefix
+      tls:
+        - secretName: backstage-tls
+          hosts:
+            - "backstage.example.com"
+  
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 7007
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 7007
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+postgresql:
+  enabled: true
+  auth:
+    username: backstage
+    password: "ChangeMeToASecurePassword123!"  # IMPORTANT: Change this!
+    database: backstage
+    postgresPassword: "ChangeMePostgresPassword123!"  # IMPORTANT: Change this!
+  
+  primary:
+    persistence:
+      enabled: true
+      size: 50Gi  # Adjust based on your needs
+      storageClassName: "managed-csi"  # AKS managed premium
+    
+    resources:
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+      requests:
+        cpu: 500m
+        memory: 512Mi
+  
+  service:
+    type: ClusterIP
+    port: 5432
+
+secrets:
+  backendSecret: <YOUR-BACKEND-SECRET-HERE>  # IMPORTANT: Change this!
+  github:
+    token: ""  # Set via --set or environment variable if needed
+
+env:
+  - name: LOG_LEVEL
+    value: "info"
+  - name: NODE_ENV
+    value: "production"
+  - name: POSTGRES_HOST
+    value: "backstage-postgresql"
+  - name: POSTGRES_PORT
+    value: "5432"
+  - name: POSTGRES_USER
+    value: "backstage"
+  - name: POSTGRES_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: backstage-secrets
+        key: postgres-password
+
+serviceAccount:
+  create: true
+  name: "backstage"
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
